@@ -4,7 +4,8 @@ import React from "react"
 import type { ReactElement } from "react"
 
 export function getCategoryColor(category: string): string {
-  switch (category) {
+  const lowerCategory = category.toLowerCase();
+  switch (lowerCategory) {
     case "conflict":
       return "#e63946"
     case "security":
@@ -27,7 +28,8 @@ export function getCategoryColor(category: string): string {
 }
 
 export function getCategoryBackground(category: string): string {
-  switch (category) {
+  const lowerCategory = category.toLowerCase();
+  switch (lowerCategory) {
     case "conflict":
       return "rgba(230, 57, 70, 0.15)"
     case "security":
@@ -91,5 +93,29 @@ export function getSourceBadge(sourceType: string): ReactElement {
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
+}
+
+export function getCategoryIcon(category: string): string {
+  const lowerCategory = category.toLowerCase();
+  switch (lowerCategory) {
+    case 'conflict':
+      return 'bomb'
+    case 'security':
+      return 'shield-alt'
+    case 'economy':
+      return 'chart-line'
+    case 'diplomacy':
+      return 'handshake'
+    case 'politics':
+      return 'landmark'
+    case 'environment':
+      return 'leaf'
+    case 'humanitarian':
+      return 'hand-holding-heart'
+    case 'technology':
+      return 'microchip'
+    default:
+      return 'info-circle'
+  }
 }
 

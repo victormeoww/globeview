@@ -34,53 +34,162 @@ export default function IntelligenceDashboard() {
     humanitarian: 24,
   })
 
+  // Fetch intelligence updates from API
+  useEffect(() => {
+    const fetchIntelligenceUpdates = async () => {
+      try {
+        const response = await fetch('/api/live-updates?limit=50');
+        if (!response.ok) {
+          throw new Error('Failed to fetch intelligence updates');
+        }
+        const updates = await response.json();
+        if (updates && updates.length > 0) {
+          // Assign dynamic timestamps to the updates based on their position
+          const now = Date.now();
+          const timestampedUpdates = updates.map((update: Event, index: number) => {
+            // Calculate timestamp based on position
+            // First item (index 0) is newest (LIVE)
+            // Last items are oldest
+            const minutesAgo = index * 8; // Each item is 8 minutes older than the one above it
+            const timestamp = now - (minutesAgo * 60 * 1000); // Convert minutes to milliseconds
+            
+            // Assign time based on how long ago it was
+            let time;
+            if (index === 0) {
+              time = "LIVE"; // Top item is LIVE
+            } else if (minutesAgo < 60) {
+              time = `${minutesAgo}m ago`;
+            } else {
+              time = `${Math.floor(minutesAgo / 60)}h ago`;
+            }
+            
+            return {
+              ...update,
+              timestamp,
+              time,
+              date: null, // Remove fixed dates
+              createdAt: timestamp,
+              updatedAt: timestamp
+            };
+          });
+          
+          setEvents(timestampedUpdates);
+          setFilteredEvents(timestampedUpdates);
+          
+          // Update counters based on actual data
+          const categories: Record<string, number> = {
+            conflict: 0,
+            security: 0,
+            economy: 0,
+            diplomacy: 0,
+            humanitarian: 0,
+          };
+          
+          updates.forEach((update: Event) => {
+            const category = update.category.toLowerCase();
+            if (categories[category] !== undefined) {
+              categories[category]++;
+            }
+          });
+          
+          setCounters(prev => ({
+            ...prev,
+            events: updates.length,
+            ...categories
+          }));
+        }
+      } catch (error) {
+        console.error('Error fetching intelligence updates:', error);
+      }
+    };
+
+    // Fetch updates initially
+    fetchIntelligenceUpdates();
+    
+    // Then fetch periodically with random interval between 5-17 seconds
+    const getRandomInterval = () => Math.floor(5000 + Math.random() * 12000);
+    let intervalId: NodeJS.Timeout;
+    
+    const scheduleNextFetch = () => {
+      intervalId = setTimeout(() => {
+        fetchIntelligenceUpdates();
+        scheduleNextFetch();
+      }, getRandomInterval());
+    };
+    
+    scheduleNextFetch();
+    
+    return () => clearTimeout(intervalId);
+  }, []);
+
   // Update event times from "LIVE" to "X time ago"
   useEffect(() => {
     const updateTimestamps = () => {
       setEvents(prevEvents => 
-        prevEvents.map(event => {
-          if (event.timestamp) {
-            const now = Date.now();
-            const diff = now - event.timestamp;
-            
-            // Convert to seconds
-            const seconds = Math.floor(diff / 1000);
-            
+        prevEvents.map((event, index) => {
+          if (!event.timestamp) {
+            // If there's no timestamp (shouldn't happen with our updates), return as is
+            return event;
+          }
+          
+          const now = Date.now();
+          const diff = now - event.timestamp;
+          
+          // Convert to seconds
+          const seconds = Math.floor(diff / 1000);
+          const minutes = Math.floor(seconds / 60);
+          const hours = Math.floor(minutes / 60);
+          
+          // For the most recent event (index 0)
+          if (index === 0) {
+            // Keep it as "LIVE" for the first 20 seconds
             if (seconds < 20) {
               return { ...event, time: "LIVE" };
-            } else if (seconds < 60) {
-              return { ...event, time: `${seconds}s ago` };
-            } else if (seconds < 3600) {
-              return { ...event, time: `${Math.floor(seconds / 60)}m ago` };
-            } else {
-              return { ...event, time: `${Math.floor(seconds / 3600)}h ago` };
             }
           }
-          return event;
+          
+          // Update time based on how long ago it occurred
+          if (seconds < 60) {
+            return { ...event, time: `${seconds}s ago` };
+          } else if (minutes < 60) {
+            return { ...event, time: `${minutes}m ago` };
+          } else {
+            return { ...event, time: `${hours}h ago` };
+          }
         })
       );
 
-      // Also update filtered events with the same logic
+      // Also update filtered events with the same timestamp logic
       setFilteredEvents(prevEvents => 
-        prevEvents.map(event => {
-          if (event.timestamp) {
-            const now = Date.now();
-            const diff = now - event.timestamp;
-            
-            // Convert to seconds
-            const seconds = Math.floor(diff / 1000);
-            
+        prevEvents.map((event, index) => {
+          if (!event.timestamp) {
+            return event;
+          }
+          
+          const now = Date.now();
+          const diff = now - event.timestamp;
+          
+          // Convert to seconds
+          const seconds = Math.floor(diff / 1000);
+          const minutes = Math.floor(seconds / 60);
+          const hours = Math.floor(minutes / 60);
+          
+          // For the most recent event (index 0)
+          if (index === 0) {
+            // Keep it as "LIVE" for the first 20 seconds
             if (seconds < 20) {
               return { ...event, time: "LIVE" };
-            } else if (seconds < 60) {
-              return { ...event, time: `${seconds}s ago` };
-            } else if (seconds < 3600) {
-              return { ...event, time: `${Math.floor(seconds / 60)}m ago` };
-            } else {
-              return { ...event, time: `${Math.floor(seconds / 3600)}h ago` };
             }
           }
-          return event;
+          
+          // Update time based on how long ago it occurred
+          if (seconds < 60) {
+            return { ...event, time: `${seconds}s ago` };
+          } else if (minutes < 60) {
+            return { ...event, time: `${minutes}m ago` };
+          } else {
+            return { ...event, time: `${hours}h ago` };
+          }
         })
       );
     };

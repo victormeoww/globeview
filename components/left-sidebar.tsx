@@ -199,8 +199,8 @@ export default function LeftSidebar({
                 <span
                   className="category-badge text-xs px-1.5 py-0.5 rounded"
                   style={{
-                    backgroundColor: getCategoryBackground(event.category),
-                    color: getCategoryColor(event.category),
+                    backgroundColor: getCategoryBackground(event.category.toLowerCase()),
+                    color: getCategoryColor(event.category.toLowerCase()),
                   }}
                 >
                   {event.category.toUpperCase()}
@@ -223,9 +223,7 @@ export default function LeftSidebar({
               <div className="flex items-center justify-between mt-3">
                 <div className="flex items-center text-xs">
                   <span className="source-icon mr-1">
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
+                    <i className={`fa-solid fa-${getSourceIcon(event.sourceType)} w-3.5 h-3.5 text-[#8c95a6]`}></i>
                   </span>
                   <span className="font-medium">{event.source}</span>
                   {getSourceBadge(event.sourceType)}

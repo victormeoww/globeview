@@ -207,8 +207,7 @@ function LeafletMap({ events, onEventClick, mapStyle, focusedEventId, mapRef, fi
         width: 100%;
         height: 100%;
         border-radius: 50%;
-        animation: pulse 1.5s infinite;
-        opacity: 0.6;
+        opacity: 0.5;
       }
       .marker-inner {
         position: absolute;

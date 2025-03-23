@@ -23,29 +23,17 @@ const fixLeafletIcons = () => {
 
 // Custom marker icon creator
 const createCustomIcon = (category: string, isLive: boolean = false) => {
-  const color = getCategoryColor(category);
+  const color = getCategoryColor(category.toLowerCase());
   
   return L.divIcon({
     className: "custom-marker-icon",
     html: `
       <div class="marker-container">
-        <div class="marker-pulse" style="background-color: ${color}; animation: pulse 1.5s infinite; opacity: 0.4; border-radius: 50%; width: 30px; height: 30px; position: absolute; top: -15px; left: -15px; z-index: 1;"></div>
+        <div class="marker-pulse" style="background-color: ${color}; opacity: 0.4; border-radius: 50%; width: 26px; height: 26px; position: absolute; top: -13px; left: -13px; z-index: 1;"></div>
         <div class="marker-outer" style="background-color: rgba(10, 14, 20, 0.6); border: 2px solid ${color}; border-radius: 50%; width: 18px; height: 18px; position: absolute; top: -9px; left: -9px; z-index: 2;"></div>
         <div class="marker-inner" style="background-color: ${color}; border-radius: 50%; width: 10px; height: 10px; position: absolute; top: -5px; left: -5px; z-index: 3; box-shadow: 0 0 10px ${color};"></div>
-        ${isLive ? `<div class="live-indicator" style="background-color: #e63946; border-radius: 50%; width: 6px; height: 6px; position: absolute; top: -16px; left: 4px; z-index: 4; animation: blink 1s infinite;"></div>` : ''}
+        ${isLive ? `<div class="live-indicator" style="background-color: #e63946; border-radius: 50%; width: 6px; height: 6px; position: absolute; top: -16px; left: 4px; z-index: 4;"></div>` : ''}
       </div>
-      <style>
-        @keyframes pulse {
-          0% { transform: scale(0.8); opacity: 0.8; }
-          70% { transform: scale(1.5); opacity: 0; }
-          100% { transform: scale(0.8); opacity: 0; }
-        }
-        @keyframes blink {
-          0% { opacity: 1; }
-          50% { opacity: 0.4; }
-          100% { opacity: 1; }
-        }
-      </style>
     `,
     iconSize: [30, 30],
     iconAnchor: [15, 15],
@@ -166,7 +154,7 @@ const MapComponents = ({ events, onEventClick, selectedMapStyle, focusedEventId,
         <Marker
           key={event.id}
           position={[event.location.lat, event.location.lng]}
-          icon={createCustomIcon(event.category, event.time === "LIVE")}
+          icon={createCustomIcon(event.category.toLowerCase(), event.time === "LIVE")}
           eventHandlers={{
             click: () => onEventClick(event),
             mouseover: () => setHoveredEvent(event),
@@ -179,7 +167,7 @@ const MapComponents = ({ events, onEventClick, selectedMapStyle, focusedEventId,
                 <div className="flex items-center gap-2">
                   <span
                     className="w-2 h-2 rounded-full"
-                    style={{ backgroundColor: getCategoryColor(event.category) }}
+                    style={{ backgroundColor: getCategoryColor(event.category.toLowerCase()) }}
                   ></span>
                   <span className="text-xs font-medium">{event.title}</span>
                 </div>

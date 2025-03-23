@@ -131,7 +131,7 @@ const MapContainer = forwardRef(({
   // Default to 3D mode and set appropriate default style for each mode
   const [is3DMode, setIs3DMode] = useState(true)
   const [selectedLeafletStyle, setSelectedLeafletStyle] = useState(leafletMapStyles[1]) // Dark for 2D
-  const [selectedMapboxStyle, setSelectedMapboxStyle] = useState(mapboxMapStyles[0]) // Satellite for 3D
+  const [selectedMapboxStyle, setSelectedMapboxStyle] = useState(mapboxMapStyles[2]) // Terrain (outdoors) for 3D
   const [showControls, setShowControls] = useState(true)
 
   useEffect(() => {

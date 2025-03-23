@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react"
 import mapboxgl from 'mapbox-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
 import type { Event } from "@/lib/types"
-import { getCategoryColor } from "@/lib/utils"
+import { getCategoryColor, getCategoryIcon } from "@/lib/utils"
 
 // Set Mapbox access token directly
 const MAPBOX_TOKEN = 'pk.eyJ1IjoidmljdG9yamkiLCJhIjoiY204a3ByczVrMGVuaDJycHJ3dW8zMTJubiJ9.YiH1_sr-iq8zQX4nzauOfg';
@@ -278,7 +278,7 @@ const MapboxGlobe = ({ events, onEventClick, mapStyle, focusedEventId, forwarded
     if (!map.current || !mapInitialized) return;
 
     try {
-      // Clear existing markers
+      // Clear existing markers (we'll let the visibility function handle marker creation)
       Object.values(eventMarkers.current).forEach(marker => marker.remove());
       eventMarkers.current = {};
       
@@ -286,77 +286,6 @@ const MapboxGlobe = ({ events, onEventClick, mapStyle, focusedEventId, forwarded
       Object.values(popups.current).forEach(popup => popup.remove());
       popups.current = {};
 
-      // Add markers for each event
-      events.forEach(event => {
-        // Create custom marker element
-        const color = getCategoryColor(event.category);
-        const isLive = event.time === "LIVE";
-        
-        const el = document.createElement('div');
-        el.className = 'custom-marker';
-        el.innerHTML = `
-          <div class="marker-container">
-            <div class="marker-pulse" style="background-color: ${color}; animation: pulse 1.5s infinite; opacity: 0.4; border-radius: 50%; width: 30px; height: 30px; position: absolute; top: -15px; left: -15px; z-index: 1;"></div>
-            <div class="marker-outer" style="background-color: rgba(10, 14, 20, 0.6); border: 2px solid ${color}; border-radius: 50%; width: 18px; height: 18px; position: absolute; top: -9px; left: -9px; z-index: 2;"></div>
-            <div class="marker-inner" style="background-color: ${color}; border-radius: 50%; width: 10px; height: 10px; position: absolute; top: -5px; left: -5px; z-index: 3; box-shadow: 0 0 10px ${color};"></div>
-            ${isLive ? `<div class="live-indicator" style="background-color: #e63946; border-radius: 50%; width: 6px; height: 6px; position: absolute; top: -16px; left: 4px; z-index: 4; animation: blink 1s infinite;"></div>` : ''}
-          </div>
-        `;
-        
-        // Create popup for hover
-        const popup = new mapboxgl.Popup({
-          closeButton: false,
-          closeOnClick: false,
-          offset: 15,
-          className: 'event-popup'
-        }).setHTML(`
-          <div class="bg-[#141a24] text-[#f0f2f5] p-2 rounded">
-            <div class="flex items-center gap-2">
-              <span
-                class="w-2 h-2 rounded-full"
-                style="background-color: ${color}"
-              ></span>
-              <span class="text-xs font-medium">${event.title}</span>
-            </div>
-            <div class="flex justify-between items-center mt-1">
-              <div class="text-xs text-[#8c95a6]">${event.source}</div>
-              <div class="text-xs text-[#8c95a6]">
-                ${event.time === "LIVE" ? 
-                  `<span class="text-[#e63946] font-semibold animate-pulse">LIVE</span>` : 
-                  event.time}
-              </div>
-            </div>
-          </div>
-        `);
-        
-        // Create marker
-        const marker = new mapboxgl.Marker(el)
-          .setLngLat([event.location.lng, event.location.lat])
-          .addTo(map.current!);
-          
-        // Event handlers
-        el.addEventListener('mouseenter', () => {
-          setHoveredEvent(event);
-          popup.addTo(map.current!);
-          marker.setPopup(popup);
-          marker.togglePopup();
-        });
-        
-        el.addEventListener('mouseleave', () => {
-          setHoveredEvent(null);
-          popup.remove();
-        });
-        
-        el.addEventListener('click', () => {
-          userInteracted.current = true; // Mark as user interaction
-          onEventClick(event);
-        });
-        
-        // Store references to markers and popups
-        eventMarkers.current[event.id] = marker;
-        popups.current[event.id] = popup;
-      });
-      
       // Only set initial view once and if no user interaction
       if (!userInteracted.current && initialViewSet.current && events.length > 0) {
         // Find optimal center after adding markers
@@ -408,16 +337,6 @@ const MapboxGlobe = ({ events, onEventClick, mapStyle, focusedEventId, forwarded
   useEffect(() => {
     const style = document.createElement('style');
     style.innerHTML = `
-      @keyframes pulse {
-        0% { transform: scale(0.8); opacity: 0.8; }
-        70% { transform: scale(1.5); opacity: 0; }
-        100% { transform: scale(0.8); opacity: 0; }
-      }
-      @keyframes blink {
-        0% { opacity: 1; }
-        50% { opacity: 0.4; }
-        100% { opacity: 1; }
-      }
       .mapboxgl-popup.event-popup .mapboxgl-popup-content {
         background-color: transparent;
         border: none;
@@ -472,6 +391,10 @@ const MapboxGlobe = ({ events, onEventClick, mapStyle, focusedEventId, forwarded
         height: 100%;
         overflow: hidden;
       }
+      /* Hide markers that are not in view */
+      .mapboxgl-marker.marker-hidden {
+        display: none !important;
+      }
     `;
     document.head.appendChild(style);
     
@@ -479,6 +402,139 @@ const MapboxGlobe = ({ events, onEventClick, mapStyle, focusedEventId, forwarded
       document.head.removeChild(style);
     };
   }, []);
+
+  // Add a check for markers in view - only on move end to prevent jitter
+  // Completely replace the approach with a much simpler method
+  useEffect(() => {
+    if (!map.current || !mapInitialized) return;
+    
+    // Only render markers that are likely to be visible on globe
+    // We use this approach to reduce the number of DOM elements
+    const updateMarkerVisibility = () => {
+      if (!map.current) return;
+      
+      // Get the current map center
+      const center = map.current.getCenter();
+      const centerLng = center.lng;
+      
+      // Loop through all events and update (or create) markers accordingly
+      events.forEach(event => {
+        // First check if marker exists
+        let marker = eventMarkers.current[event.id];
+        
+        // Calculate if this marker should be rendered based on longitude difference
+        // This is a simplified approach: if a point is more than 90° from the center, 
+        // it's likely on the back side of the globe
+        const pointLng = event.location.lng;
+        const lngDiff = Math.abs(centerLng - pointLng);
+        
+        // Use a wider threshold (120 degrees instead of 90) to prevent edge flickering
+        // Also add a small buffer zone to prevent rapid adding/removing at the edge
+        const isLikelyVisible = lngDiff <= 120 || lngDiff >= 240;
+        
+        // Only add/remove markers when they're well beyond the threshold to avoid flickering
+        // This creates a "hysteresis" effect that stabilizes the markers
+        if (marker && !isLikelyVisible && lngDiff > 140 && lngDiff < 220) {
+          marker.remove();
+          delete eventMarkers.current[event.id];
+          
+          // Also remove popup if it exists
+          if (popups.current[event.id]) {
+            popups.current[event.id].remove();
+            delete popups.current[event.id];
+          }
+        }
+        // Create marker if it doesn't exist but should be visible
+        else if (!marker && isLikelyVisible) {
+          // This code is similar to the marker creation in the events useEffect
+          const color = getCategoryColor(event.category.toLowerCase());
+          const isLive = event.time === "LIVE";
+          const iconName = getCategoryIcon(event.category.toLowerCase());
+          
+          const el = document.createElement('div');
+          el.className = 'custom-marker';
+          el.innerHTML = `
+            <div class="marker-container">
+              <div class="marker-pulse" style="background-color: ${color}; opacity: 0.3; border-radius: 50%; width: 36px; height: 36px; position: absolute; top: -18px; left: -18px; z-index: 1;"></div>
+              <div class="marker-outer" style="background-color: rgba(10, 14, 20, 0.8); border: 2px solid ${color}; border-radius: 50%; width: 26px; height: 26px; position: absolute; top: -13px; left: -13px; z-index: 2; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 8px rgba(0, 0, 0, 0.5);">
+                <i class="fa-solid fa-${iconName}" style="color: ${color}; font-size: 12px;"></i>
+              </div>
+              ${isLive ? `<div class="live-indicator" style="background-color: #e63946; border-radius: 50%; width: 8px; height: 8px; position: absolute; top: -18px; left: 6px; z-index: 4;"></div>` : ''}
+            </div>
+          `;
+          
+          // Create popup
+          const popup = new mapboxgl.Popup({
+            closeButton: false,
+            closeOnClick: false,
+            offset: 15,
+            className: 'event-popup'
+          }).setHTML(`
+            <div class="bg-[#141a24] text-[#f0f2f5] p-2 rounded-lg shadow-lg border border-[#2a3548]">
+              <div class="flex items-center gap-2">
+                <span
+                  class="flex items-center justify-center w-6 h-6 rounded-full"
+                  style="background-color: rgba(10, 14, 20, 0.8); border: 1px solid ${color};"
+                >
+                  <i class="fa-solid fa-${iconName}" style="color: ${color}; font-size: 12px;"></i>
+                </span>
+                <span class="text-xs font-medium">${event.title}</span>
+              </div>
+              <div class="flex justify-between items-center mt-1">
+                <div class="text-xs text-[#8c95a6]">${event.source}</div>
+                <div class="text-xs text-[#8c95a6]">
+                  ${event.time === "LIVE" ? 
+                    `<span class="text-[#e63946] font-semibold">LIVE</span>` : 
+                    event.time}
+                </div>
+              </div>
+            </div>
+          `);
+          
+          // Create marker
+          marker = new mapboxgl.Marker(el)
+            .setLngLat([event.location.lng, event.location.lat])
+            .addTo(map.current!);
+            
+          // Event handlers
+          el.addEventListener('mouseenter', () => {
+            setHoveredEvent(event);
+            popup.addTo(map.current!);
+            marker.setPopup(popup);
+            marker.togglePopup();
+          });
+          
+          el.addEventListener('mouseleave', () => {
+            setHoveredEvent(null);
+            popup.remove();
+          });
+          
+          el.addEventListener('click', () => {
+            userInteracted.current = true; // Mark as user interaction
+            onEventClick(event);
+          });
+          
+          // Store references
+          eventMarkers.current[event.id] = marker;
+          popups.current[event.id] = popup;
+        }
+      });
+    };
+    
+    // Update on these events only
+    map.current.on('moveend', updateMarkerVisibility);
+    map.current.on('load', updateMarkerVisibility);
+    
+    // Initial update
+    updateMarkerVisibility();
+    
+    return () => {
+      if (map.current) {
+        map.current.off('moveend', updateMarkerVisibility);
+        map.current.off('load', updateMarkerVisibility);
+      }
+    };
+  }, [events, mapInitialized, onEventClick]);
 
   // Add window resize handler to ensure correct rendering
   useEffect(() => {
