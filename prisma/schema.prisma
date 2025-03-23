@@ -1,0 +1,63 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model IntelligenceUpdate {
+  id          Int      @id @default(autoincrement())
+  title       String
+  category    String
+  location    Json     // Stores lat/lng coordinates
+  date        DateTime
+  time        String
+  source      String
+  sourceType  String
+  sourceIcon  String
+  excerpt     String
+  content     String   @db.Text
+  sourceUrl   String?
+  timestamp   DateTime @default(now())
+  icon        String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  webhookId   Int?     // For tracking which webhook created this update
+  metadata    Json?    // For additional flexible data storage
+  tags        Tag[]    // Many-to-many relationship with tags
+  status      String   @default("active") // active, archived, deleted
+  webhook     Webhook? @relation(fields: [webhookId], references: [id])
+
+  @@index([category])
+  @@index([sourceType])
+  @@index([timestamp])
+  @@index([webhookId])
+}
+
+model Tag {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  updates   IntelligenceUpdate[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Webhook {
+  id          Int      @id @default(autoincrement())
+  name        String
+  secret      String   // For webhook authentication
+  url         String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  lastTrigger DateTime?
+  updates     IntelligenceUpdate[]
+}
